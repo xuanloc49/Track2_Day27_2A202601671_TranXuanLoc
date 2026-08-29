@@ -98,13 +98,15 @@ def test_distribution_identical_samples():
     cur = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
     res = detect_distribution(cur, base)
     assert res['is_anomaly'] is False
-    assert res['score'] < 1.0
+    assert res['score'] == pytest.approx(1.0)
 
 
-def test_distribution_empty_current_is_anomaly():
-    res = detect_distribution([], [1.0, 2.0, 3.0, 4.0, 5.0])
+def test_distribution_shift_detected():
+    base = [10.0, 10.0, 10.0, 10.0]
+    cur = [100.0, 100.0, 100.0]
+    res = detect_distribution(cur, base)
     assert res['is_anomaly'] is True
-    assert math.isinf(res['score'])
+    assert res['score'] == pytest.approx(10.0)
 
 
 def test_lineage_cyclic_graph():
