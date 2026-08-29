@@ -60,3 +60,26 @@ def extract_dbt_dataset_graph(manifest_path: str | Path) -> dict[str, list[str]]
     for parent, children in child_map.items():
         graph[parent] = list(children)
     return graph
+
+
+def extract_dbt_clean_graph(manifest_path: str | Path) -> dict[str, list[str]]:
+    """Parses dbt manifest and returns clean human-readable model dependency graph."""
+    path = Path(manifest_path)
+    if not path.exists():
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+    graph: dict[str, list[str]] = {}
+    child_map = manifest.get("child_map", {})
+
+    def _clean_name(unique_id: str) -> str:
+        parts = unique_id.split(".")
+        return parts[-1] if len(parts) > 1 else unique_id
+
+    for parent, children in child_map.items():
+        clean_p = _clean_name(parent)
+        clean_children = [_clean_name(c) for c in children if not c.startswith("test.")]
+        if clean_children:
+            graph[clean_p] = list(set(clean_children))
+    return graph
+

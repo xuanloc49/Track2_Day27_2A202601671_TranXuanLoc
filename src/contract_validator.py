@@ -31,7 +31,9 @@ def _issue(
     }
 
 
-def load_contract(path: str | Path) -> dict[str, Any]:
+def load_contract(path: str | Path | dict[str, Any]) -> dict[str, Any]:
+    if isinstance(path, dict):
+        return path
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
@@ -46,7 +48,6 @@ def _check_type(series: pd.Series, declared_type: str) -> tuple[bool, int, str]:
 
     if dtype_str in {"integer", "int", "bigint", "int64", "int32"}:
         coerced = pd.to_numeric(non_null, errors="coerce")
-        # Invalid if non-convertible or contains non-integer decimal
         invalid_mask = coerced.isna() | (coerced % 1 != 0)
         invalid_count = int(invalid_mask.sum())
         return (invalid_count == 0), invalid_count, f"invalid_integer_count={invalid_count}"
@@ -193,7 +194,22 @@ def validate_dataframe(
                 )
             )
 
-    # 7. Dataset Freshness Validation
+        # 7. Regex / Pattern Match
+        pattern = rules.get("regex") or rules.get("pattern")
+        if pattern:
+            invalid_regex = series.notna() & ~series.astype(str).str.match(pattern)
+            invalid_count = int(invalid_regex.sum())
+            issues.append(
+                _issue(
+                    "pattern",
+                    column=column,
+                    severity=severity,
+                    passed=(invalid_count == 0),
+                    details=f"invalid_pattern_count={invalid_count}; pattern={pattern}",
+                )
+            )
+
+    # 8. Dataset Freshness Validation
     freshness = contract.get("freshness")
     if freshness and isinstance(freshness, dict):
         freshness_col = freshness.get("column")
@@ -210,7 +226,6 @@ def validate_dataframe(
                     else pd.Timestamp(datetime.now(timezone.utc))
                 )
                 delay_minutes = (now_utc - latest_ts).total_seconds() / 60.0
-                # Stale check: delay exceeds max_delay
                 is_fresh = delay_minutes <= max_delay
                 issues.append(
                     _issue(
@@ -291,6 +306,12 @@ def quarantine_invalid_rows(
         if "max" in rules:
             num = pd.to_numeric(series, errors="coerce")
             bad_mask |= (series.notna() & num.isna()) | (num > rules["max"])
+        if "min_length" in rules:
+            bad_mask |= series.notna() & (series.astype(str).str.len() < int(rules["min_length"]))
+        pattern = rules.get("regex") or rules.get("pattern")
+        if pattern:
+            bad_mask |= series.notna() & ~series.astype(str).str.match(pattern)
 
     return df[~bad_mask].copy(), df[bad_mask].copy()
+
 

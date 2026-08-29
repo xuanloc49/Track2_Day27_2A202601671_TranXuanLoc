@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-29T03:43:24.520199+00:00",
+  "timestamp": "2026-08-29T05:00:52.188695+00:00",
   "orders_rows": 600,
   "failed_contract_checks": 0,
   "critical_contract_failures": 0,
@@ -11,7 +11,7 @@
     "method": "auto:same_segment_mad",
     "reason": "median=252.500, mad=12.500, threshold=3.0; context_applied=['metric_name', 'day_of_week', 'same_segment_history']"
   },
-  "freshness_minutes": 5.025222083333333,
+  "freshness_minutes": 5.01968955,
   "kb_text_length_signal": {
     "is_anomaly": false,
     "score": 0.7547940916996035,
