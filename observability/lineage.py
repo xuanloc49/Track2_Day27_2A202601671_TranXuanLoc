@@ -44,11 +44,13 @@ def get_column_downstream(
     return out
 
 
-def extract_dbt_dataset_graph(manifest_path: str | Path) -> dict[str, list[str]]:
+def extract_dbt_dataset_graph(
+    manifest_path: str | Path, *, include_tests: bool = False
+) -> dict[str, list[str]]:
     """Minimal dbt manifest parser.
 
-    It maps each dbt node unique_id to the nodes that depend on it. Students may
-    enrich names, exposures, owners, columns, or OpenLineage facets.
+    It maps each dbt node unique_id to the nodes that depend on it.
+    Excludes test nodes by default so downstream blast-radius reflects data assets.
     """
     path = Path(manifest_path)
     if not path.exists():
@@ -57,9 +59,15 @@ def extract_dbt_dataset_graph(manifest_path: str | Path) -> dict[str, list[str]]
         manifest = json.load(f)
     graph: dict[str, list[str]] = {}
     child_map = manifest.get("child_map", {})
+    data_prefixes = ("model.", "seed.", "snapshot.", "source.", "exposure.")
     for parent, children in child_map.items():
-        graph[parent] = list(children)
+        if not include_tests and not parent.startswith(data_prefixes):
+            continue
+        graph[parent] = [
+            child for child in children if include_tests or child.startswith(data_prefixes)
+        ]
     return graph
+
 
 
 def extract_dbt_clean_graph(manifest_path: str | Path) -> dict[str, list[str]]:

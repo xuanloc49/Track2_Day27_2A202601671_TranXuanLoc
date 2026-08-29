@@ -31,10 +31,11 @@ def _issue(
         "check": check,
         "column": column,
         "severity": severity,
-        "action": _SEVERITY_ACTION[severity],
+        "action": "none" if passed else _SEVERITY_ACTION[severity],
         "passed": bool(passed),
         "details": details,
     }
+
 
 
 def load_contract(path: str | Path | dict[str, Any]) -> dict[str, Any]:
