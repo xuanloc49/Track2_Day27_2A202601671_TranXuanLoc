@@ -14,6 +14,10 @@ import pandas as pd
 import yaml
 
 
+_SEVERITY_ACTION = {"critical": "block", "warning": "quarantine", "info": "warn"}
+_SUPPORTED_TYPES = {"integer", "int", "number", "float", "decimal", "datetime", "timestamp", "date", "string", "str", "boolean", "bool"}
+
+
 def _issue(
     check: str,
     *,
@@ -22,10 +26,12 @@ def _issue(
     passed: bool,
     details: str,
 ) -> dict[str, Any]:
+    severity = severity if severity in _SEVERITY_ACTION else "warning"
     return {
         "check": check,
         "column": column,
         "severity": severity,
+        "action": _SEVERITY_ACTION[severity],
         "passed": bool(passed),
         "details": details,
     }
@@ -35,7 +41,7 @@ def load_contract(path: str | Path | dict[str, Any]) -> dict[str, Any]:
     if isinstance(path, dict):
         return path
     with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        return yaml.safe_load(f) or {}
 
 
 def _check_type(series: pd.Series, declared_type: str) -> tuple[bool, int, str]:
@@ -47,15 +53,19 @@ def _check_type(series: pd.Series, declared_type: str) -> tuple[bool, int, str]:
     dtype_str = declared_type.lower().strip()
 
     if dtype_str in {"integer", "int", "bigint", "int64", "int32"}:
-        coerced = pd.to_numeric(non_null, errors="coerce")
-        invalid_mask = coerced.isna() | (coerced % 1 != 0)
+        numeric = pd.to_numeric(non_null, errors="coerce")
+        bool_values = non_null.map(lambda value: isinstance(value, (bool,))).astype(bool)
+        invalid_mask = numeric.isna() | ((numeric % 1) != 0) | bool_values
         invalid_count = int(invalid_mask.sum())
         return (invalid_count == 0), invalid_count, f"invalid_integer_count={invalid_count}"
 
     elif dtype_str in {"number", "float", "double", "numeric", "decimal"}:
-        coerced = pd.to_numeric(non_null, errors="coerce")
-        invalid_count = int(coerced.isna().sum())
+        numeric = pd.to_numeric(non_null, errors="coerce")
+        bool_values = non_null.map(lambda value: isinstance(value, (bool,))).astype(bool)
+        invalid_mask = numeric.isna() | bool_values
+        invalid_count = int(invalid_mask.sum())
         return (invalid_count == 0), invalid_count, f"invalid_number_count={invalid_count}"
+
 
     elif dtype_str in {"string", "str", "varchar", "text"}:
         return True, 0, "string_ok"

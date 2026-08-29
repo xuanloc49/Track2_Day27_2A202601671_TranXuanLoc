@@ -5,6 +5,7 @@ from typing import Any, Iterable
 import numpy as np
 
 from observability.anomaly import zscore_detector
+from observability.distribution import detect_distribution_shift
 
 
 def approximate_token_lengths(texts: Iterable[str]) -> list[int]:
@@ -27,27 +28,10 @@ def detect_text_length_shift(
 
 
 def detect_embedding_norm_shift(
-    current_norms: Iterable[float],
-    baseline_norms: Iterable[float],
-    *,
-    threshold: float = 3.0,
+    current_norms: Iterable[float], baseline_norms: Iterable[float]
 ) -> dict[str, Any]:
-    """Detects embedding norm / vector magnitude shift using statistical z-score."""
-    try:
-        cur = np.asarray(list(current_norms), dtype=float)
-        base = np.asarray(list(baseline_norms), dtype=float)
-        cur = cur[np.isfinite(cur)]
-        base = base[np.isfinite(base)]
-    except Exception:
-        cur = np.array([], dtype=float)
-        base = np.array([], dtype=float)
-
-    if cur.size == 0 or base.size == 0:
-        return {"is_anomaly": False, "score": 0.0, "method": "embedding_norm_zscore", "reason": "empty_input"}
-
-    cur_mean = float(np.mean(cur))
-    result = zscore_detector(cur_mean, base, threshold=threshold)
-    result["metric"] = "mean_embedding_norm"
-    result["current_mean"] = cur_mean
-    result["baseline_mean"] = float(np.mean(base))
+    """Use norm-distribution drift as a model-free embedding health signal."""
+    result = detect_distribution_shift(current_norms, baseline_norms)
+    result["metric"] = "embedding_norm_distribution"
+    result["method"] = f"embedding:{result['method']}"
     return result
